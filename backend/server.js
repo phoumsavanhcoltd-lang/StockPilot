@@ -4,58 +4,87 @@ import { GoogleGenAI } from '@google/genai';
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
-
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: '15mb' }));
 
-app.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'stockpilot-backend', version: '0.2.0' });
-});
+app.get('/health', (_req, res) => res.json({ ok: true, service: 'stockpilot-backend', version: '0.3.0' }));
+
+const SYSTEM_PROMPT = `You are StockPilot, an expert stock-content metadata assistant.
+Analyze the supplied image for commercial stock submission.
+Return ONLY JSON: {"title":"string","description":"string","keywords":["30-50 strings"],"category":"string"}.
+Rules: describe only visible content; never invent people, brands, locations, events or concepts. Put the most useful keywords first. Remove duplicates and near-duplicates. Use natural commercial wording, no hype, no keyword stuffing.`;
+
+function normalizeMetadata(raw) {
+  const keywords = Array.isArray(raw.keywords) ? raw.keywords : String(raw.keywords || '').split(',');
+  const unique = [...new Set(keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean))].slice(0, 50);
+  return {
+    title: String(raw.title || '').trim(),
+    description: String(raw.description || '').trim(),
+    keywords: unique,
+    category: String(raw.category || '').trim()
+  };
+}
+
+async function analyzeGemini({ apiKey, model, imageBase64, mimeType }) {
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: model || 'gemini-2.5-flash',
+    contents: [{ role: 'user', parts: [{ text: SYSTEM_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
+    config: { responseMimeType: 'application/json' }
+  });
+  return JSON.parse(response.text?.trim() || '{}');
+}
+
+async function analyzeOpenAI({ apiKey, model, imageBase64, mimeType }) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: model || 'gpt-4.1-mini',
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: [
+        { type: 'text', text: 'Analyze this image.' },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } }
+      ] }]
+    })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message || 'OpenAI request failed.');
+  return JSON.parse(data.choices?.[0]?.message?.content || '{}');
+}
+
+async function analyzeClaude({ apiKey, model, imageBase64, mimeType }) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: model || 'claude-sonnet-4-5', max_tokens: 1200,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
+        { type: 'text', text: 'Analyze this image and return only the requested JSON.' }
+      ] }]
+    })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message || 'Claude request failed.');
+  const text = data.content?.find(x => x.type === 'text')?.text || '{}';
+  return JSON.parse(text.replace(/^```json\s*|\s*```$/g, '').trim());
+}
 
 app.post('/analyze', async (req, res) => {
-  const apiKey = String(req.header('x-gemini-api-key') || '').trim();
-  const { imageBase64, mimeType, model = 'gemini-2.5-flash' } = req.body || {};
-
-  if (!apiKey) return res.status(400).json({ error: 'Gemini API key is required.' });
-  if (!imageBase64 || !mimeType?.startsWith('image/')) {
-    return res.status(400).json({ error: 'A valid image is required.' });
-  }
-
+  const { provider = 'gemini', apiKey, imageBase64, mimeType, model } = req.body || {};
+  if (!apiKey) return res.status(400).json({ error: 'API key is required.' });
+  if (!imageBase64 || !mimeType?.startsWith('image/')) return res.status(400).json({ error: 'A valid image is required.' });
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const prompt = `You are StockPilot, an expert stock-content metadata assistant.
-Analyze the supplied image for Adobe Stock submission.
-Return ONLY valid JSON with this schema:
-{
-  "title": "clear commercial title, concise, no hype",
-  "description": "accurate one-sentence description",
-  "keywords": ["30 to 50 relevant keywords, most important first"],
-  "category": "best matching Adobe Stock category"
-}
-Rules: describe only visible content; do not invent people, brands, locations, events, or concepts that are not supported by the image. Avoid duplicate keywords and keyword stuffing.`;
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType, data: imageBase64 } }
-        ]
-      }],
-      config: { responseMimeType: 'application/json' }
-    });
-
-    const text = response.text?.trim();
-    if (!text) throw new Error('Gemini returned an empty response.');
-    const metadata = JSON.parse(text);
-    res.json({ ok: true, metadata, model });
+    let raw;
+    if (provider === 'openai') raw = await analyzeOpenAI({ apiKey, model, imageBase64, mimeType });
+    else if (provider === 'claude') raw = await analyzeClaude({ apiKey, model, imageBase64, mimeType });
+    else raw = await analyzeGemini({ apiKey, model, imageBase64, mimeType });
+    res.json({ ok: true, provider, model, metadata: normalizeMetadata(raw) });
   } catch (error) {
-    const message = error?.message || 'AI analysis failed.';
-    res.status(502).json({ error: message });
+    res.status(502).json({ error: error?.message || 'AI analysis failed.' });
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`StockPilot backend listening on http://127.0.0.1:${PORT}`);
-});
+app.listen(PORT, '127.0.0.1', () => console.log(`StockPilot backend listening on http://127.0.0.1:${PORT}`));

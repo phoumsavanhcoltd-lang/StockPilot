@@ -1,4 +1,4 @@
-const $ = (id) => document.querySelector(`#${id}`);
+const $ = id => document.querySelector(`#${id}`);
 const imageInput = $('image');
 const analyzeButton = $('analyze');
 const status = $('status');
@@ -12,7 +12,6 @@ imageInput.addEventListener('change', () => {
   analyzeButton.disabled = !file;
   status.textContent = file ? `Ready: ${file.name}` : 'Choose an image to begin.';
 });
-
 $('settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 function fileToBase64(file) {
@@ -28,17 +27,15 @@ analyzeButton.addEventListener('click', async () => {
   const file = imageInput.files?.[0];
   if (!file) return;
   analyzeButton.disabled = true;
-  status.textContent = 'Analyzing image with Gemini...';
+  status.textContent = 'Analyzing image...';
   try {
-    const cfg = await chrome.storage.local.get({
-      apiKey: '', model: 'gemini-2.5-flash', backend: 'http://127.0.0.1:8787'
-    });
-    if (!cfg.apiKey) throw new Error('Add your Gemini API key in Settings first.');
+    const cfg = await chrome.storage.local.get({ provider: 'gemini', apiKey: '', model: 'gemini-2.5-flash', backend: 'http://127.0.0.1:8787' });
+    if (!cfg.apiKey) throw new Error('Open Settings and add your AI API key first.');
     const imageBase64 = await fileToBase64(file);
     const response = await fetch(`${cfg.backend}/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': cfg.apiKey },
-      body: JSON.stringify({ imageBase64, mimeType: file.type, model: cfg.model })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: cfg.provider, apiKey: cfg.apiKey, imageBase64, mimeType: file.type, model: cfg.model })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'AI request failed.');
@@ -47,7 +44,7 @@ analyzeButton.addEventListener('click', async () => {
     description.value = m.description || '';
     keywords.value = Array.isArray(m.keywords) ? m.keywords.join(', ') : (m.keywords || '');
     category.value = m.category || '';
-    status.textContent = `Generated with ${result.model}. Review before filling.`;
+    status.textContent = `Generated with ${result.provider} / ${result.model}. Review before filling.`;
   } catch (error) {
     status.textContent = error.message;
   } finally {
