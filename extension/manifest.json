@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "StockPilot",
+  "version": "0.1.0",
+  "description": "AI-assisted metadata workflow for stock contributors.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "StockPilot"
+  },
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["https://contributor.stock.adobe.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://contributor.stock.adobe.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StockPilot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>StockPilot</h1>
+        <p>AI metadata assistant</p>
+      </div>
+      <span class="badge">MVP</span>
+    </header>
+    <section class="card">
+      <label for="image">Image</label>
+      <input id="image" type="file" accept="image/*">
+      <button id="analyze" disabled>Analyze image</button>
+      <div id="status" class="status">Choose an image to begin.</div>
+    </section>
+    <section class="card">
+      <label for="title">Title</label>
+      <input id="title" placeholder="Generated title">
+      <label for="description">Description</label>
+      <textarea id="description" rows="4" placeholder="Generated description"></textarea>
+      <label for="keywords">Keywords</label>
+      <textarea id="keywords" rows="4" placeholder="keyword, keyword, keyword"></textarea>
+      <label for="category">Category</label>
+      <input id="category" placeholder="Generated category">
+      <button id="fill">Fill Adobe Stock</button>
+    </section>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

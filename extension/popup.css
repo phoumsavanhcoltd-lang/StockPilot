@@ -1,0 +1,15 @@
+* { box-sizing: border-box; }
+body { margin: 0; width: 380px; font: 14px system-ui, sans-serif; background: #f5f6f8; color: #17202a; }
+.app { padding: 16px; }
+header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; }
+h1 { margin: 0; font-size: 22px; }
+p { margin: 3px 0 0; color: #68737d; }
+.badge { padding: 4px 8px; border-radius: 999px; background: #17202a; color: white; font-size: 11px; }
+.card { background: white; border: 1px solid #e1e5e9; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+label { display: block; font-weight: 650; margin: 10px 0 5px; }
+input, textarea { width: 100%; border: 1px solid #ccd2d8; border-radius: 8px; padding: 9px; font: inherit; }
+textarea { resize: vertical; }
+button { width: 100%; margin-top: 10px; border: 0; border-radius: 8px; padding: 10px; font-weight: 700; cursor: pointer; }
+button:not(:disabled) { background: #17202a; color: white; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.status { margin-top: 9px; color: #68737d; font-size: 12px; }
