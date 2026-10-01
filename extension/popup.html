@@ -5,20 +5,7 @@
 <header><div><strong>StockPilot</strong><span class="sub">AI Metadata Assistant</span></div><button id="settingsBtn">⚙</button></header>
 <main>
 <section class="card"><label class="drop"><input id="imageInput" type="file" accept="image/*"><span>📷 Choose image</span><small>or drag & drop</small></label><button id="analyzeBtn" class="primary" disabled>Analyze Image</button><div id="status" class="status"></div></section>
-<section class="card">
-<div class="sectionTitle"><h2>Adobe Stock Page</h2><button id="scanBtn">Scan Page</button></div>
-<div id="scanStatus" class="status">Open Adobe Stock Contributor first.</div>
-<div id="detection" class="detection hidden"></div>
-<div class="debugActions"><button id="debugBtn" disabled>Field Debugger</button><button id="copyDebugBtn" disabled>Copy Report</button></div>
-<pre id="debugReport" class="debugReport hidden"></pre>
-<button id="fillBtn" class="primary" disabled>Fill Metadata</button>
-</section>
-<section id="review" class="card hidden">
-<div class="sectionTitle"><h2>Metadata Review</h2><span id="score" class="score">—</span></div>
-<label>Title<textarea id="title" rows="2"></textarea></label>
-<label>Description<textarea id="description" rows="4"></textarea></label>
-<label>Keywords <span id="keywordCount"></span></label><div id="keywords" class="keywords"></div>
-<div id="warnings" class="warnings hidden"></div>
-<div class="actions"><button id="regenerateBtn">Regenerate</button><button id="reviewFillBtn" class="primary">Fill Adobe Stock</button></div>
-</section>
+<section class="card"><div class="sectionTitle"><h2>Adobe Stock Page</h2><button id="scanBtn">Scan Page</button></div><div id="scanStatus" class="status">Open Adobe Stock Contributor first.</div><div id="detection" class="detection hidden"></div><div id="verification" class="verification hidden"></div><button id="verifyBtn" class="primary" disabled>Verify Autofill</button><button id="fillBtn" class="primary" disabled>Fill Verified Fields</button></section>
+<section id="review" class="card hidden"><div class="sectionTitle"><h2>Metadata Review</h2><span id="score" class="score">—</span></div>
+<label>Title<textarea id="title" rows="2"></textarea></label><label>Description<textarea id="description" rows="4"></textarea></label><label>Keywords <span id="keywordCount"></span></label><div id="keywords" class="keywords"></div><div id="warnings" class="warnings hidden"></div><div class="actions"><button id="regenerateBtn">Regenerate</button></div></section>
 </main><script src="popup.js"></script></body></html>
