@@ -9,27 +9,24 @@
 <body>
   <main class="app">
     <header>
-      <div>
-        <h1>StockPilot</h1>
-        <p>AI metadata assistant</p>
-      </div>
-      <span class="badge">MVP</span>
+      <div><h1>StockPilot</h1><p>AI metadata assistant</p></div>
+      <button id="settings" class="icon" title="Settings">⚙</button>
     </header>
     <section class="card">
       <label for="image">Image</label>
       <input id="image" type="file" accept="image/*">
-      <button id="analyze" disabled>Analyze image</button>
+      <button id="analyze" disabled>Analyze with AI</button>
       <div id="status" class="status">Choose an image to begin.</div>
     </section>
     <section class="card">
       <label for="title">Title</label>
-      <input id="title" placeholder="Generated title">
+      <input id="title" placeholder="AI title">
       <label for="description">Description</label>
-      <textarea id="description" rows="4" placeholder="Generated description"></textarea>
+      <textarea id="description" rows="4" placeholder="AI description"></textarea>
       <label for="keywords">Keywords</label>
-      <textarea id="keywords" rows="4" placeholder="keyword, keyword, keyword"></textarea>
+      <textarea id="keywords" rows="5" placeholder="keyword, keyword, keyword"></textarea>
       <label for="category">Category</label>
-      <input id="category" placeholder="Generated category">
+      <input id="category" placeholder="AI category">
       <button id="fill">Fill Adobe Stock</button>
     </section>
   </main>

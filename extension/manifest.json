@@ -4,8 +4,12 @@
   "version": "0.2.0",
   "description": "AI-assisted metadata workflow for stock contributors.",
   "action": { "default_popup": "popup.html", "default_title": "StockPilot" },
+  "options_page": "settings.html",
   "permissions": ["activeTab", "storage", "scripting"],
-  "host_permissions": ["https://contributor.stock.adobe.com/*", "http://127.0.0.1:8787/*"],
+  "host_permissions": [
+    "https://contributor.stock.adobe.com/*",
+    "http://127.0.0.1:8787/*"
+  ],
   "content_scripts": [{
     "matches": ["https://contributor.stock.adobe.com/*"],
     "js": ["content.js"],

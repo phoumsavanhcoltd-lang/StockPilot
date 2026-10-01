@@ -1,95 +1,61 @@
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import express from 'express';
+import cors from 'cors';
+import { GoogleGenAI } from '@google/genai';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.join(__dirname, '.env');
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
-  }
-}
-
+const app = express();
 const PORT = Number(process.env.PORT || 8787);
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const API_KEY = process.env.GEMINI_API_KEY;
 
-function send(res, status, body) {
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
-  });
-  res.end(JSON.stringify(body));
-}
+app.use(cors({ origin: true }));
+app.use(express.json({ limit: '15mb' }));
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', chunk => {
-      data += chunk;
-      if (data.length > 15 * 1024 * 1024) req.destroy();
-    });
-    req.on('end', () => resolve(data));
-    req.on('error', reject);
-  });
-}
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, service: 'stockpilot-backend', version: '0.2.0' });
+});
 
-const server = http.createServer(async (req, res) => {
-  if (req.method === 'OPTIONS') return send(res, 204, {});
-  if (req.method === 'GET' && req.url === '/health') {
-    return send(res, 200, { ok: true, configured: Boolean(API_KEY), model: MODEL });
+app.post('/analyze', async (req, res) => {
+  const apiKey = String(req.header('x-gemini-api-key') || '').trim();
+  const { imageBase64, mimeType, model = 'gemini-2.5-flash' } = req.body || {};
+
+  if (!apiKey) return res.status(400).json({ error: 'Gemini API key is required.' });
+  if (!imageBase64 || !mimeType?.startsWith('image/')) {
+    return res.status(400).json({ error: 'A valid image is required.' });
   }
-  if (req.method !== 'POST' || req.url !== '/analyze') return send(res, 404, { error: 'Not found' });
-  if (!API_KEY) return send(res, 503, { error: 'GEMINI_API_KEY is not configured in backend/.env' });
 
   try {
-    const input = JSON.parse(await readBody(req));
-    if (!input.image?.data || !input.image?.mimeType) return send(res, 400, { error: 'image.data and image.mimeType are required' });
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `You are StockPilot, an expert stock-content metadata assistant.
+Analyze the supplied image for Adobe Stock submission.
+Return ONLY valid JSON with this schema:
+{
+  "title": "clear commercial title, concise, no hype",
+  "description": "accurate one-sentence description",
+  "keywords": ["30 to 50 relevant keywords, most important first"],
+  "category": "best matching Adobe Stock category"
+}
+Rules: describe only visible content; do not invent people, brands, locations, events, or concepts that are not supported by the image. Avoid duplicate keywords and keyword stuffing.`;
 
-    const prompt = `You are StockPilot, an AI metadata assistant for stock contributors. Analyze the supplied image and return accurate, commercially useful metadata. Do not invent brands, people, locations, or facts that are not visually supported. Prefer concrete visual concepts over generic filler. Return 30-50 concise English keywords, most relevant first. Keep the title descriptive and natural, not keyword-stuffed. Return JSON only matching the requested schema.\n\nRequired output: title, description, keywords, category.`;
-    const body = {
-      contents: [{ role: 'user', parts: [
-        { text: prompt },
-        { inline_data: { mime_type: input.image.mimeType, data: input.image.data } }
-      ]}],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            title: { type: 'STRING' },
-            description: { type: 'STRING' },
-            keywords: { type: 'ARRAY', items: { type: 'STRING' } },
-            category: { type: 'STRING' }
-          },
-          required: ['title', 'description', 'keywords', 'category']
-        }
-      }
-    };
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
-      body: JSON.stringify(body)
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType, data: imageBase64 } }
+        ]
+      }],
+      config: { responseMimeType: 'application/json' }
     });
-    const raw = await response.text();
-    if (!response.ok) return send(res, 502, { error: `Gemini API error (${response.status})`, details: raw.slice(0, 2000) });
 
-    const data = JSON.parse(raw);
-    const text = data.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
-    if (!text) return send(res, 502, { error: 'Gemini returned no text response' });
+    const text = response.text?.trim();
+    if (!text) throw new Error('Gemini returned an empty response.');
     const metadata = JSON.parse(text);
-    if (!Array.isArray(metadata.keywords)) metadata.keywords = [];
-    metadata.keywords = metadata.keywords.map(String).filter(Boolean).slice(0, 50);
-    return send(res, 200, metadata);
+    res.json({ ok: true, metadata, model });
   } catch (error) {
-    return send(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    const message = error?.message || 'AI analysis failed.';
+    res.status(502).json({ error: message });
   }
 });
 
-server.listen(PORT, '127.0.0.1', () => console.log(`StockPilot AI backend listening on http://127.0.0.1:${PORT}`));
-
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`StockPilot backend listening on http://127.0.0.1:${PORT}`);
+});
