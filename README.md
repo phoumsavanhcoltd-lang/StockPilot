@@ -27,3 +27,16 @@ The extension sends the image to `http://127.0.0.1:8787/analyze`. The backend ca
 - StockPilot only fills fields; it does not auto-submit assets.
 
 Gemini's `generateContent` API supports image input and structured JSON output, which is used by this milestone.
+
+## Database (SQLite)
+
+The backend stores every analysis in a local SQLite file (`backend/data/stockpilot.db`, override with `DB_PATH`) using Node's built-in `node:sqlite` (Node 22.13+; no extra dependency). Images and API keys are never stored.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /history?limit=&offset=` | List recent analyses |
+| `GET /history/:id` | Get one |
+| `PATCH /history/:id` | Save edited title/description/keywords/category (`filled: true` marks it as filled) |
+| `DELETE /history/:id` | Delete |
+
+The popup has a **History** dropdown to reload earlier results; edits and fills are saved automatically.

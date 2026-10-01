@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI } from '@google/genai';
 import { qualityCheck } from './metadata-engine.js';
+import { saveAnalysis, getAnalysis, listAnalyses, updateAnalysis, markFilled, deleteAnalysis } from './db.js';
 
 try { process.loadEnvFile?.(new URL('./.env', import.meta.url)); } catch { /* .env is optional */ }
 
@@ -16,6 +17,9 @@ app.use(cors({
   }
 }));
 app.use(express.json({ limit: '15mb' }));
+
+const parseId = v => (/^\d+$/.test(v) ? Number(v) : null);
+const textOrUndef = (v, max) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : undefined);
 
 app.get('/health', (_req, res) => res.json({
   ok: true,
@@ -93,7 +97,7 @@ async function analyzeClaude({ apiKey, model, imageBase64, mimeType }) {
   return parseJson(data.content?.find(x => x.type === 'text')?.text);
 }
 app.post('/analyze', async (req, res) => {
-  const { provider = 'gemini', imageBase64, mimeType } = req.body || {};
+  const { provider = 'gemini', imageBase64, mimeType, fileName } = req.body || {};
   if (!ENV_KEYS[provider]) return res.status(400).json({ error: `Unknown provider: ${provider}` });
   // Key from the request (extension settings) or, as fallback, backend/.env.
   const apiKey = req.body?.apiKey || process.env[ENV_KEYS[provider]];
@@ -114,10 +118,46 @@ app.post('/analyze', async (req, res) => {
     }
 
     const metadata = qualityCheck(raw);
-    res.json({ ok: true, provider, model, metadata });
+    const record = saveAnalysis({ fileName, provider, model, metadata });
+    res.json({ ok: true, id: record.id, provider, model, metadata });
   } catch (error) {
     res.status(502).json({ error: error?.message || 'AI analysis failed.' });
   }
+});
+
+app.get('/history', (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  res.json({ ok: true, items: listAnalyses(limit, offset) });
+});
+
+app.get('/history/:id', (req, res) => {
+  const row = parseId(req.params.id) && getAnalysis(parseId(req.params.id));
+  if (!row) return res.status(404).json({ error: 'Not found.' });
+  res.json({ ok: true, item: row });
+});
+
+app.patch('/history/:id', (req, res) => {
+  const id = parseId(req.params.id);
+  const b = req.body || {};
+  let keywords;
+  if (b.keywords !== undefined) {
+    if (!Array.isArray(b.keywords)) return res.status(400).json({ error: 'keywords must be an array.' });
+    keywords = b.keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean).slice(0, 50);
+  }
+  const row = id && updateAnalysis(id, {
+    title: textOrUndef(b.title, 200), description: textOrUndef(b.description, 500),
+    keywords, category: textOrUndef(b.category, 100)
+  });
+  if (!row) return res.status(404).json({ error: 'Not found.' });
+  if (b.filled) markFilled(id);
+  res.json({ ok: true, item: getAnalysis(id) });
+});
+
+app.delete('/history/:id', (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id || !deleteAnalysis(id)) return res.status(404).json({ error: 'Not found.' });
+  res.json({ ok: true });
 });
 
 app.listen(PORT, '127.0.0.1', () => {

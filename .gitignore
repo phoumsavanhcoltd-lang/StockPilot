@@ -8,3 +8,6 @@ Thumbs.db
 # Local secrets
 backend/.env
 backend/node_modules/
+
+# Local SQLite database
+backend/data/
