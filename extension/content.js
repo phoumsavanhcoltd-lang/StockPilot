@@ -35,6 +35,27 @@ function setValue(e,value){if(!e)return false;const text=String(value??'');
  e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text.slice(0,64)}));e.dispatchEvent(new Event('change',{bubbles:true}));e.dispatchEvent(new Event('blur',{bubbles:true}));return true;
 }
 function expected(type,m){return type==='keywords'?(Array.isArray(m.keywords)?m.keywords.join(', '):m.keywords||''):m[type]||'';}
-function fill(m){const out={};for(const type of Object.keys(FIELD_HINTS)){const c=candidates(type)[0];if(!c){out[type]={filled:false,verified:false,reason:'field-not-found'};continue}const wanted=expected(type,m);const filled=setValue(c.element,wanted);const actual=readValue(c.element);out[type]={filled,verified:filled&&norm(actual)===norm(wanted),score:c.score,actual:actual.slice(0,300)};}return out;}
-function verify(m){const r=scan();const thresholds={title:10,description:10,keywords:10,category:10};const eligible=Object.entries(r.best).every(([k,v])=>v&&v.score>=thresholds[k]);return {verified:eligible,reason:eligible?'ready':'low-confidence-field',scan:r};}
-chrome.runtime.onMessage.addListener((msg,_,send)=>{if(msg?.type==='STOCKPILOT_SCAN'){send(scan());return true}if(msg?.type==='STOCKPILOT_VERIFY_FILL'){send(verify(msg.metadata||{}));return true}if(msg?.type==='STOCKPILOT_FILL'){const result=fill(msg.metadata||{});send({filled:result,allVerified:Object.values(result).every(x=>x.verified),scan:scan()});return true}});
+const MIN_SCORE=10;
+const pickedTypes=sel=>Object.keys(FIELD_HINTS).filter(t=>!sel||sel[t]);
+// Tag-style inputs: type each keyword and press Enter.
+function fillTags(e,list){for(const k of list){setValue(e,k);for(const t of ['keydown','keyup'])e.dispatchEvent(new KeyboardEvent(t,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));}}
+function fill(m,sel){const out={};for(const type of pickedTypes(sel)){const c=candidates(type)[0];
+ if(!c){out[type]={filled:false,verified:false,reason:'field-not-found'};continue}
+ if(c.score<MIN_SCORE){out[type]={filled:false,verified:false,reason:'low-confidence-field',score:c.score};continue}
+ const wanted=expected(type,m);if(!norm(wanted)){out[type]={filled:false,verified:false,reason:'empty-value'};continue}
+ let filled=setValue(c.element,wanted);let actual=readValue(c.element);
+ if(type==='keywords'&&filled&&norm(actual)!==norm(wanted)&&Array.isArray(m.keywords)){fillTags(c.element,m.keywords);actual=readValue(c.element)||c.element.parentElement?.textContent||'';
+  filled=true;out[type]={filled,verified:m.keywords.slice(0,3).every(k=>norm(c.element.closest('form,main,body')?.textContent).includes(norm(k))),score:c.score,actual:actual.slice(0,300)};continue}
+ const ok=type==='category'?norm(actual).includes(norm(wanted))||norm(actual)===norm(wanted):norm(actual)===norm(wanted);
+ out[type]={filled,verified:filled&&ok,score:c.score,actual:actual.slice(0,300)};}return out;}
+// Dry run: no writes. A field passes if it is found, confident, and clearly beats the runner-up.
+function verify(m,sel){const r=scan();const fields={};
+ for(const type of pickedTypes(sel)){const list=r.fields[type]||[];const best=list[0],next=list[1];
+  const ok=!!best&&best.score>=MIN_SCORE&&(!next||best.score>next.score);
+  fields[type]={ok,reason:!best?'field-not-found':best.score<MIN_SCORE?'low-confidence-field':(next&&best.score===next.score)?'ambiguous-field':'ready',score:best?.score||0};}
+ const verified=Object.keys(fields).length>0&&Object.values(fields).every(f=>f.ok);
+ return {verified,fields,scan:r};}
+chrome.runtime.onMessage.addListener((msg,_,send)=>{
+ if(msg?.type==='STOCKPILOT_SCAN'){send(scan());return true}
+ if(msg?.type==='STOCKPILOT_VERIFY_FILL'){send(verify(msg.metadata||{},msg.selected));return true}
+ if(msg?.type==='STOCKPILOT_FILL'){const result=fill(msg.metadata||{},msg.selected);send({filled:result,allVerified:Object.values(result).every(x=>x.verified),scan:scan()});return true}});

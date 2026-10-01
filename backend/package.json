@@ -1,6 +1,6 @@
 {
   "name": "stockpilot-backend",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
-    "@google/genai": "latest",
-    "cors": "latest",
-    "express": "latest"
+    "@google/genai": "*",
+    "cors": "*",
+    "express": "*"
   }
 }

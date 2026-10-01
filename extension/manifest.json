@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "StockPilot",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "AI-assisted metadata workflow for stock contributors.",
   "action": { "default_popup": "popup.html", "default_title": "StockPilot" },
   "options_page": "settings.html",

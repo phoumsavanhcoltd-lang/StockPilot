@@ -1,4 +1,4 @@
-# StockPilot v0.2.0
+# StockPilot v0.4.0
 
 ## Step 1 — Local AI engine
 
