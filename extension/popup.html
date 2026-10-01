@@ -1,33 +1,17 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>StockPilot</title>
-  <link rel="stylesheet" href="popup.css">
-</head>
+﻿<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>StockPilot</title><link rel="stylesheet" href="popup.css"></head>
 <body>
-  <main class="app">
-    <header>
-      <div><h1>StockPilot</h1><p>AI metadata assistant</p></div>
-      <button id="settings" class="icon" title="Settings">⚙</button>
-    </header>
-    <section class="card">
-      <label for="image">Image</label>
-      <input id="image" type="file" accept="image/*">
-      <button id="analyze" disabled>Analyze with AI</button>
-      <div id="status" class="status">Choose an image to begin.</div>
-    </section>
-    <section class="card">
-      <label for="title">Title</label>
-      <input id="title" placeholder="AI title">
-      <label for="description">Description</label>
-      <textarea id="description" rows="4" placeholder="AI description"></textarea>
-      <label for="keywords">Keywords</label>
-      <textarea id="keywords" rows="5" placeholder="keyword, keyword, keyword"></textarea>
-      <label for="category">Category</label>
-      <input id="category" placeholder="AI category">
-      <button id="fill">Fill Adobe Stock</button>
+  <header><div><strong>StockPilot</strong><span class="sub">AI Metadata Assistant</span></div><button id="settingsBtn" title="Settings">⚙</button></header>
+  <main>
+    <section class="card"><label class="drop" id="dropZone"><input id="imageInput" type="file" accept="image/*"><span>📷 Choose image</span><small>or drag & drop</small></label><button id="analyzeBtn" class="primary" disabled>Analyze Image</button><div id="status" class="status"></div></section>
+    <section id="review" class="card hidden">
+      <div class="sectionTitle"><h2>Metadata Review</h2><span id="score" class="score">—</span></div>
+      <label>Title<textarea id="title" rows="2"></textarea></label>
+      <label>Description<textarea id="description" rows="4"></textarea></label>
+      <label>Keywords <span id="keywordCount"></span></label><div id="keywords" class="keywords"></div>
+      <div id="warnings" class="warnings hidden"></div>
+      <div class="actions"><button id="regenerateBtn">Regenerate</button><button id="fillBtn" class="primary">Fill Adobe Stock</button></div>
     </section>
   </main>
   <script src="popup.js"></script>

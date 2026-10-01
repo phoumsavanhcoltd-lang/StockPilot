@@ -1,63 +1,12 @@
-const $ = id => document.querySelector(`#${id}`);
-const imageInput = $('image');
-const analyzeButton = $('analyze');
-const status = $('status');
-const title = $('title');
-const description = $('description');
-const keywords = $('keywords');
-const category = $('category');
-
-imageInput.addEventListener('change', () => {
-  const file = imageInput.files?.[0];
-  analyzeButton.disabled = !file;
-  status.textContent = file ? `Ready: ${file.name}` : 'Choose an image to begin.';
-});
-$('settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-analyzeButton.addEventListener('click', async () => {
-  const file = imageInput.files?.[0];
-  if (!file) return;
-  analyzeButton.disabled = true;
-  status.textContent = 'Analyzing image...';
-  try {
-    const cfg = await chrome.storage.local.get({ provider: 'gemini', apiKey: '', model: 'gemini-2.5-flash', backend: 'http://127.0.0.1:8787' });
-    if (!cfg.apiKey) throw new Error('Open Settings and add your AI API key first.');
-    const imageBase64 = await fileToBase64(file);
-    const response = await fetch(`${cfg.backend}/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: cfg.provider, apiKey: cfg.apiKey, imageBase64, mimeType: file.type, model: cfg.model })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'AI request failed.');
-    const m = result.metadata;
-    title.value = m.title || '';
-    description.value = m.description || '';
-    keywords.value = Array.isArray(m.keywords) ? m.keywords.join(', ') : (m.keywords || '');
-    category.value = m.category || '';
-    status.textContent = `Generated with ${result.provider} / ${result.model}. Review before filling.`;
-  } catch (error) {
-    status.textContent = error.message;
-  } finally {
-    analyzeButton.disabled = !imageInput.files?.[0];
-  }
-});
-
-$('fill').addEventListener('click', async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return;
-  await chrome.tabs.sendMessage(tab.id, {
-    type: 'STOCKPILOT_FILL',
-    metadata: { title: title.value, description: description.value, keywords: keywords.value, category: category.value }
-  });
-  status.textContent = 'Fill request sent. Review the Adobe Stock fields before submitting.';
-});
+﻿const state={file:null,metadata:null};
+const $=id=>document.getElementById(id);
+function setStatus(t){$('status').textContent=t}
+function render(m){state.metadata=m;$('review').classList.remove('hidden');$('title').value=m.title||'';$('description').value=m.description||'';renderKeywords(m.keywords||[]);const q=m.quality||{};$('score').textContent=`Quality ${q.score??'—'}/100`;const ws=q.warnings||[];$('warnings').innerHTML=ws.length?`<b>Review warnings</b><ul>${ws.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:'';$('warnings').classList.toggle('hidden',!ws.length)}
+function renderKeywords(list){$('keywords').innerHTML='';list.forEach((k,i)=>{const s=document.createElement('span');s.className='kw';s.textContent=k;const b=document.createElement('button');b.textContent='×';b.onclick=()=>{state.metadata.keywords.splice(i,1);renderKeywords(state.metadata.keywords)};s.appendChild(b);$('keywords').appendChild(s)});$('keywordCount').textContent=`(${list.length}/50)`}
+function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+$('settingsBtn').onclick=()=>chrome.runtime.openOptionsPage();
+$('imageInput').onchange=e=>{state.file=e.target.files[0];$('analyzeBtn').disabled=!state.file;setStatus(state.file?state.file.name:'')};
+$('analyzeBtn').onclick=analyze;$('regenerateBtn').onclick=analyze;
+async function analyze(){if(!state.file)return;setStatus('Analyzing image…');$('analyzeBtn').disabled=true;try{const cfg=await chrome.storage.local.get(['backendUrl']);const fd=new FormData();fd.append('image',state.file);const r=await fetch((cfg.backendUrl||'http://127.0.0.1:8787')+'/analyze',{method:'POST',body:fd});if(!r.ok)throw new Error(await r.text());render(await r.json());setStatus('Analysis complete. Review before filling.')}catch(e){setStatus(`Error: ${e.message}`)}finally{$('analyzeBtn').disabled=false}}
+$('title').oninput=e=>state.metadata&&(state.metadata.title=e.target.value);$('description').oninput=e=>state.metadata&&(state.metadata.description=e.target.value);
+$('fillBtn').onclick=async()=>{if(!state.metadata)return;const [tab]=await chrome.tabs.query({active:true,currentWindow:true});chrome.tabs.sendMessage(tab.id,{type:'STOCKPILOT_FILL',metadata:state.metadata},()=>setStatus(chrome.runtime.lastError?'Open an Adobe Stock contributor page first.':'Fill request sent. Review the fields before submitting.'))};
