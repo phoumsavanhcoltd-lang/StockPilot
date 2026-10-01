@@ -1,30 +1,29 @@
-# StockPilot
+# StockPilot v0.2.0
 
-StockPilot is a Manifest V3 Chrome/Edge extension for assisted stock metadata workflows.
+## Step 1 — Local AI engine
 
-## MVP v0.1
+StockPilot now uses a local Node.js backend to keep the Gemini API key out of the browser extension.
 
-- Popup UI
-- Image selection
-- Metadata editor
-- Demo metadata generation
-- Adobe Stock page fill bridge
-- No automatic submission
+### Setup
 
-## Install locally
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Put your Gemini API key in `GEMINI_API_KEY`.
+3. Start the backend:
 
-1. Open `chrome://extensions` or `edge://extensions`.
-2. Enable **Developer mode**.
-3. Choose **Load unpacked**.
-4. Select the `extension` folder.
-5. Open the extension popup.
+```powershell
+cd backend
+node server.js
+```
 
-## Architecture
+4. Open Chrome/Edge → Extensions → Developer mode → Load unpacked → select `extension/`.
+5. Open an Adobe Stock contributor page, open StockPilot, select an image, and click **Analyze image**.
 
-`popup.js` handles the UI and metadata state. `content.js` runs on supported Adobe Stock contributor pages and receives fill requests from the popup.
-
-The current analyzer is intentionally a local demo placeholder. The next milestone adds a secure backend/API layer for multimodal AI generation.
+The extension sends the image to `http://127.0.0.1:8787/analyze`. The backend calls Gemini and returns structured metadata: title, description, keywords, and category.
 
 ## Security
 
-Never commit API keys, access tokens, cookies, or contributor credentials. API secrets must stay outside the browser extension.
+- Never commit `backend/.env`.
+- The extension never contains the Gemini API key.
+- StockPilot only fills fields; it does not auto-submit assets.
+
+Gemini's `generateContent` API supports image input and structured JSON output, which is used by this milestone.
